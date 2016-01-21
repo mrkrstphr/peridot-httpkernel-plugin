@@ -13,12 +13,23 @@ class HttpKernelScope extends Scope
     protected $httpKernelApplication;
 
     /**
+     * @var string
+     */
+    protected $propertyName;
+
+    /**
+     * @var callable
+     */
+    protected $httpKernelFactory;
+
+    /**
      * @param callable|HttpKernelInterface $factory
      */
     public function __construct($factory, $property = "client")
     {
         $httpKernelApplication = $factory;
         if (is_callable($factory)) {
+            $this->httpKernelFactory = $factory;
             $httpKernelApplication = call_user_func($factory);
         }
         if (!$httpKernelApplication instanceof HttpKernelInterface) {
@@ -54,6 +65,26 @@ class HttpKernelScope extends Scope
      */
     public function setHttpKernelClient(Client $client, $property = "client")
     {
+        $this->propertyName = $property;
         $this->$property = $client;
+    }
+
+    /**
+     * @return Client
+     */
+    public function createHttpKernelClient()
+    {
+        if (is_callable(($this->httpKernelFactory))) {
+            $this->httpKernelApplication = call_user_func($this->httpKernelFactory);
+
+            $clientClass = get_class($this->{$this->propertyName});
+            $this->setHttpKernelClient(new $clientClass($this->httpKernelApplication), $this->propertyName);
+
+            return $this->{$this->propertyName};
+        }
+
+        throw new \RuntimeException(
+            'Cannot create a new HttpKernel unless a factory is provided to HttpKernelPlugin::register'
+        );
     }
 } 
